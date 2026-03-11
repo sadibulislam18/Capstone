@@ -1,0 +1,32 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# PaddleOCR model cache (downloaded automatically on first run)
+.paddlex/
+
+# Uploaded images & results (runtime data)
+data/uploads/
+data/results/
+
+# Logs
+*.log
+nohup.out
+/tmp/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/

@@ -3,7 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "./Dockerfile"
 
 [deploy]
-startCommand = "cd backend && uvicorn fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"
+startCommand = "uvicorn backend.fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

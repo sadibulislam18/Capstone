@@ -6,6 +6,7 @@
 FROM python:3.11-slim
 
 # Install system dependencies needed by OpenCV, PaddleOCR
+# Cache bust: v2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -45,4 +46,4 @@ HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=3 \
 
 # Start the server
 # Railway provides PORT env variable, default to 8000
-CMD ["sh", "-c", "cd backend && uvicorn fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn backend.fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"]

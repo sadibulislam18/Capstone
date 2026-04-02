@@ -85,20 +85,61 @@ class PaddleOCREngine:
         print("=" * 60)
     
     def _init_paddleocr(self):
-        """Initialize PaddleOCR v3 with English model."""
-        print("\nLoading PaddleOCR v3 (English-only)...")
+        """Initialize PaddleOCR with English model (supports both v2 and v3 API)."""
+        print("\nLoading PaddleOCR (English-only)...")
+        self._use_v3_api = False
+        
         try:
             from paddleocr import PaddleOCR
+            import paddleocr
+            version = getattr(paddleocr, '__version__', '0.0.0')
+            major_ver = int(version.split('.')[0])
+            print(f"  PaddleOCR version: {version}")
             
-            # PaddleOCR v3 API — simplified parameters
-            # Disable doc preprocessing for cropped regions (faster)
-            self.ocr = PaddleOCR(
-                lang='en',
-                use_doc_orientation_classify=False,
-                use_doc_unwarping=False,
-                use_textline_orientation=False,
-            )
-            print("[OK] PaddleOCR v3 loaded (English model)")
+            if major_ver >= 3:
+                # PaddleOCR v3 API
+                try:
+                    self.ocr = PaddleOCR(
+                        lang='en',
+                        use_doc_orientation_classify=False,
+                        use_doc_unwarping=False,
+                        use_textline_orientation=False,
+                    )
+                    # Quick test to see if predict() actually works
+                    test_img = np.zeros((50, 150, 3), dtype=np.uint8) + 255
+                    cv2.putText(test_img, "test", (5, 35), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+                    test_result = self.ocr.predict(test_img)
+                    if test_result and len(test_result) > 0:
+                        r = test_result[0]
+                        texts = r.get('rec_texts', []) if hasattr(r, 'get') else []
+                        if texts:
+                            self._use_v3_api = True
+                            print(f"  [OK] PaddleOCR v3 API verified (test returned: {texts})")
+                        else:
+                            print("  [WARN] v3 API returned empty, falling back to v2 API...")
+                            raise RuntimeError("v3 API returned empty text")
+                    else:
+                        raise RuntimeError("v3 API returned no results")
+                except Exception as e:
+                    print(f"  [WARN] v3 predict() failed: {e}")
+                    print("  Falling back to PaddleOCR v2 API...")
+                    self.ocr = PaddleOCR(
+                        use_angle_cls=False,
+                        lang='en',
+                        show_log=False,
+                    )
+                    self._use_v3_api = False
+            else:
+                # PaddleOCR v2 API
+                self.ocr = PaddleOCR(
+                    use_angle_cls=False,
+                    lang='en',
+                    show_log=False,
+                )
+                self._use_v3_api = False
+            
+            api_label = "v3 (predict)" if self._use_v3_api else "v2 (ocr)"
+            print(f"[OK] PaddleOCR loaded (English model, using {api_label} API)")
             
         except Exception as e:
             print(f"[ERROR] PaddleOCR failed to load: {e}")
@@ -164,11 +205,7 @@ class PaddleOCREngine:
     def _run_ocr(self, image: np.ndarray) -> List[Tuple[str, float]]:
         """
         Run PaddleOCR on image and return text+confidence pairs.
-        
-        Handles multiple PaddleOCR result formats:
-        - v3 OCRResult dict with 'rec_texts'/'rec_scores'
-        - v2 list-of-lists format [[box, (text, conf)], ...]
-        - Attribute-based access for PaddleX result objects
+        Automatically uses v3 or v2 API based on what worked during init.
         
         Args:
             image: BGR image
@@ -177,74 +214,68 @@ class PaddleOCREngine:
             List of (text, confidence) tuples
         """
         try:
-            results = self.ocr.predict(image)
-            
-            # ── DEBUG: Log raw output to understand the format ──
-            print(f"[PaddleOCR DEBUG] Raw result type: {type(results)}")
-            if results:
-                print(f"[PaddleOCR DEBUG] Result len: {len(results)}")
-                if len(results) > 0:
-                    r0 = results[0]
-                    print(f"[PaddleOCR DEBUG] Item[0] type: {type(r0)}")
-                    if hasattr(r0, 'keys'):
-                        print(f"[PaddleOCR DEBUG] Item[0] keys: {list(r0.keys())}")
-                    if hasattr(r0, 'rec_texts'):
-                        print(f"[PaddleOCR DEBUG] Item[0].rec_texts: {r0.rec_texts}")
-                    print(f"[PaddleOCR DEBUG] Item[0] repr: {repr(r0)[:300]}")
+            if self._use_v3_api:
+                return self._run_ocr_v3(image)
             else:
-                print("[PaddleOCR DEBUG] results is empty/None")
-            
-            if not results:
-                return []
-            
-            text_results = []
-            
-            for page_result in results:
-                # ── Method 1: Dict-like access with .get() (PaddleOCR v3 OCRResult) ──
-                if hasattr(page_result, 'get'):
-                    rec_texts = page_result.get('rec_texts', [])
-                    rec_scores = page_result.get('rec_scores', [])
-                    
-                    if rec_texts:
-                        for text, score in zip(rec_texts, rec_scores):
-                            if text and str(text).strip():
-                                text_results.append((str(text).strip(), float(score)))
-                        continue
-                
-                # ── Method 2: Attribute access (PaddleX result objects) ──
-                if hasattr(page_result, 'rec_texts') and hasattr(page_result, 'rec_scores'):
-                    rec_texts = page_result.rec_texts
-                    rec_scores = page_result.rec_scores
-                    
-                    if rec_texts:
-                        for text, score in zip(rec_texts, rec_scores):
-                            if text and str(text).strip():
-                                text_results.append((str(text).strip(), float(score)))
-                        continue
-                
-                # ── Method 3: PaddleOCR v2 list-of-lists format ──
-                # v2 returns: [[[box_points, (text, confidence)], ...]]
-                if isinstance(page_result, list):
-                    for line in page_result:
-                        if isinstance(line, (list, tuple)) and len(line) == 2:
-                            text_info = line[1]
-                            if isinstance(text_info, (list, tuple)) and len(text_info) == 2:
-                                text, score = text_info
-                                if text and str(text).strip():
-                                    text_results.append((str(text).strip(), float(score)))
-                
-                # ── Method 4: Try to iterate if it's some other iterable ──
-                elif hasattr(page_result, '__iter__'):
-                    print(f"[PaddleOCR DEBUG] Unknown iterable type: {type(page_result)}")
-            
-            print(f"[PaddleOCR DEBUG] Extracted {len(text_results)} text results")
-            return text_results
-            
+                return self._run_ocr_v2(image)
         except Exception as e:
             print(f"[PaddleOCR Error] {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
             return []
+    
+    def _run_ocr_v3(self, image: np.ndarray) -> List[Tuple[str, float]]:
+        """Run OCR using PaddleOCR v3 predict() API."""
+        results = self.ocr.predict(image)
+        
+        if not results:
+            return []
+        
+        text_results = []
+        for page_result in results:
+            # Dict-like access (OCRResult)
+            if hasattr(page_result, 'get'):
+                rec_texts = page_result.get('rec_texts', [])
+                rec_scores = page_result.get('rec_scores', [])
+                if rec_texts:
+                    for text, score in zip(rec_texts, rec_scores):
+                        if text and str(text).strip():
+                            text_results.append((str(text).strip(), float(score)))
+                    continue
+            
+            # Attribute access
+            if hasattr(page_result, 'rec_texts') and hasattr(page_result, 'rec_scores'):
+                rec_texts = page_result.rec_texts
+                rec_scores = page_result.rec_scores
+                if rec_texts:
+                    for text, score in zip(rec_texts, rec_scores):
+                        if text and str(text).strip():
+                            text_results.append((str(text).strip(), float(score)))
+        
+        return text_results
+    
+    def _run_ocr_v2(self, image: np.ndarray) -> List[Tuple[str, float]]:
+        """Run OCR using PaddleOCR v2 ocr() API."""
+        results = self.ocr.ocr(image, cls=False)
+        
+        if not results:
+            return []
+        
+        text_results = []
+        for page_result in results:
+            if page_result is None:
+                continue
+            # v2 format: [[box, (text, confidence)], ...]
+            if isinstance(page_result, list):
+                for line in page_result:
+                    if isinstance(line, (list, tuple)) and len(line) == 2:
+                        text_info = line[1]
+                        if isinstance(text_info, (list, tuple)) and len(text_info) == 2:
+                            text, score = text_info
+                            if text and str(text).strip():
+                                text_results.append((str(text).strip(), float(score)))
+        
+        return text_results
     
     def recognize(self, image: np.ndarray, field_type: str = None) -> Dict:
         """

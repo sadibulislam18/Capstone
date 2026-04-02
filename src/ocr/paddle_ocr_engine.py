@@ -159,10 +159,12 @@ class PaddleOCREngine:
     
     def _run_ocr(self, image: np.ndarray) -> List[Tuple[str, float]]:
         """
-        Run PaddleOCR v3 on image and return text+confidence pairs.
+        Run PaddleOCR on image and return text+confidence pairs.
         
-        PaddleOCR v3 uses predict() and returns OCRResult dicts
-        with 'rec_texts' and 'rec_scores'.
+        Handles multiple PaddleOCR result formats:
+        - v3 OCRResult dict with 'rec_texts'/'rec_scores'
+        - v2 list-of-lists format [[box, (text, conf)], ...]
+        - Attribute-based access for PaddleX result objects
         
         Args:
             image: BGR image
@@ -175,24 +177,63 @@ class PaddleOCREngine:
             
             # ── DEBUG: Log raw output to understand the format ──
             print(f"[PaddleOCR DEBUG] Raw result type: {type(results)}")
-            print(f"[PaddleOCR DEBUG] Raw result: {results}")
+            if results:
+                print(f"[PaddleOCR DEBUG] Result len: {len(results)}")
+                if len(results) > 0:
+                    r0 = results[0]
+                    print(f"[PaddleOCR DEBUG] Item[0] type: {type(r0)}")
+                    if hasattr(r0, 'keys'):
+                        print(f"[PaddleOCR DEBUG] Item[0] keys: {list(r0.keys())}")
+                    if hasattr(r0, 'rec_texts'):
+                        print(f"[PaddleOCR DEBUG] Item[0].rec_texts: {r0.rec_texts}")
+                    print(f"[PaddleOCR DEBUG] Item[0] repr: {repr(r0)[:300]}")
+            else:
+                print("[PaddleOCR DEBUG] results is empty/None")
             
             if not results:
-                print("[PaddleOCR DEBUG] results is empty/None")
                 return []
             
             text_results = []
-            for i, page_result in enumerate(results):
-                print(f"[PaddleOCR DEBUG] page_result[{i}] type: {type(page_result)}")
-                print(f"[PaddleOCR DEBUG] page_result[{i}]: {page_result}")
-                
-                rec_texts = page_result.get('rec_texts', [])
-                rec_scores = page_result.get('rec_scores', [])
-                
-                for text, score in zip(rec_texts, rec_scores):
-                    if text and text.strip():
-                        text_results.append((text.strip(), float(score)))
             
+            for page_result in results:
+                # ── Method 1: Dict-like access with .get() (PaddleOCR v3 OCRResult) ──
+                if hasattr(page_result, 'get'):
+                    rec_texts = page_result.get('rec_texts', [])
+                    rec_scores = page_result.get('rec_scores', [])
+                    
+                    if rec_texts:
+                        for text, score in zip(rec_texts, rec_scores):
+                            if text and str(text).strip():
+                                text_results.append((str(text).strip(), float(score)))
+                        continue
+                
+                # ── Method 2: Attribute access (PaddleX result objects) ──
+                if hasattr(page_result, 'rec_texts') and hasattr(page_result, 'rec_scores'):
+                    rec_texts = page_result.rec_texts
+                    rec_scores = page_result.rec_scores
+                    
+                    if rec_texts:
+                        for text, score in zip(rec_texts, rec_scores):
+                            if text and str(text).strip():
+                                text_results.append((str(text).strip(), float(score)))
+                        continue
+                
+                # ── Method 3: PaddleOCR v2 list-of-lists format ──
+                # v2 returns: [[[box_points, (text, confidence)], ...]]
+                if isinstance(page_result, list):
+                    for line in page_result:
+                        if isinstance(line, (list, tuple)) and len(line) == 2:
+                            text_info = line[1]
+                            if isinstance(text_info, (list, tuple)) and len(text_info) == 2:
+                                text, score = text_info
+                                if text and str(text).strip():
+                                    text_results.append((str(text).strip(), float(score)))
+                
+                # ── Method 4: Try to iterate if it's some other iterable ──
+                elif hasattr(page_result, '__iter__'):
+                    print(f"[PaddleOCR DEBUG] Unknown iterable type: {type(page_result)}")
+            
+            print(f"[PaddleOCR DEBUG] Extracted {len(text_results)} text results")
             return text_results
             
         except Exception as e:

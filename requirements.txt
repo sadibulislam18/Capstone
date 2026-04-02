@@ -1,0 +1,41 @@
+# ─── MediScan AI Server — Railway Cloud Requirements ───
+# Python 3.11 recommended
+# CPU-only (no GPU on Railway free tier)
+
+# ─── Core Deep Learning (CPU-only for cloud) ───
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu
+torchaudio==2.1.0+cpu
+
+# ─── YOLO (Object Detection) ────────────────────
+ultralytics>=8.0.0
+
+# ─── OCR ─────────────────────────────────────────
+paddlepaddle>=2.6.0
+paddleocr>=2.7.0
+
+# ─── Image Processing ───────────────────────────
+opencv-python-headless>=4.8.0
+Pillow>=10.0.0
+scikit-image>=0.21.0
+
+# ─── Data Science ────────────────────────────────
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# ─── Text Processing ────────────────────────────
+python-dateutil>=2.8.2
+regex>=2023.6.3
+
+# ─── API Framework ──────────────────────────────
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+aiofiles>=23.1.0
+
+# ─── Utilities ──────────────────────────────────
+rich>=13.4.2
+tqdm>=4.65.0
+python-dotenv>=1.0.0

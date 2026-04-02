@@ -64,10 +64,15 @@ class ImageQualityChecker:
         
         Args:
             model_path: Path to trained ResNet18 model weights
-            device: 'cuda' or 'cpu' (auto-detected if None)
+            device: 'mps', 'cuda', or 'cpu' (auto-detected if None)
         """
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            if torch.backends.mps.is_available():
+                self.device = torch.device('mps')
+            elif torch.cuda.is_available():
+                self.device = torch.device('cuda')
+            else:
+                self.device = torch.device('cpu')
         else:
             self.device = torch.device(device)
         

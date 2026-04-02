@@ -21,6 +21,7 @@ import sys
 import cv2
 import json
 import numpy as np
+import torch
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict
@@ -100,6 +101,14 @@ class PrescriptionExtractorV6:
         self.ocr_engine = None
         self.medicine_matcher = None
         self.quality_checker = None
+
+        # Device selection: MPS (Apple Silicon) → CUDA → CPU
+        if torch.backends.mps.is_available():
+            self.device = 'mps'
+        elif torch.cuda.is_available():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
         
         if use_quality_check:
             self._init_quality_checker()
@@ -128,7 +137,8 @@ class PrescriptionExtractorV6:
         print(f"\n[1] Loading YOLO: {self.yolo_path.name}")
         from ultralytics import YOLO
         self.yolo_model = YOLO(str(self.yolo_path))
-        print(f"    [OK] YOLO loaded ({len(self.CLASS_NAMES)} classes)")
+        self.yolo_model.to(self.device)
+        print(f"    [OK] YOLO loaded ({len(self.CLASS_NAMES)} classes) → device: {self.device}")
     
     def _init_ocr(self, use_gpu: bool):
         """Initialize PaddleOCR v3 engine"""
@@ -154,7 +164,7 @@ class PrescriptionExtractorV6:
     
     def detect_fields(self, image: np.ndarray, conf_threshold: float = 0.25) -> List[DetectedField]:
         """Detect prescription fields using YOLO v6."""
-        results = self.yolo_model(image, conf=conf_threshold, verbose=False)
+        results = self.yolo_model(image, conf=conf_threshold, verbose=False, device=self.device)
         detected = []
         for result in results:
             for box in result.boxes:

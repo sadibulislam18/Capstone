@@ -66,11 +66,20 @@ async def startup_event():
     logger.info("  STARTING MEDISCAN API SERVER V6.1")
     logger.info("=" * 70)
     
-    if torch.cuda.is_available():
-        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+    # Device detection: MPS (Apple Silicon) → CUDA → CPU
+    if torch.backends.mps.is_available():
+        _device_name = "mps (Apple Silicon GPU)"
+    elif torch.cuda.is_available():
+        _device_name = f"cuda ({torch.cuda.get_device_name(0)})"
     else:
-        logger.warning("GPU not available, using CPU")
-    
+        _device_name = "cpu"
+    logger.info(f"🚀 MediScan AI Backend — Device: {_device_name}")
+
+    # Force CPU on cloud (no MPS/CUDA available)
+    import os
+    if os.environ.get("RAILWAY_ENVIRONMENT"):
+        logger.info("☁️  Running on Railway Cloud — CPU mode")
+
     logger.info("Loading AI models...")
     
     # Import here to avoid import issues at module level
@@ -338,13 +347,15 @@ def start_server(host: str = "0.0.0.0", port: int = 8000):
 
 
 if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
     print("=" * 70)
     print("  MEDISCAN API SERVER V6.1")
     print("  Pipeline: Quality Check + YOLOv8 (9-class) + PaddleOCR")
     print("=" * 70)
     print()
-    print("  Local:   http://localhost:8000")
-    print("  Docs:    http://localhost:8000/docs")
-    print("  Health:  http://localhost:8000/health")
+    print(f"  Local:   http://localhost:{port}")
+    print(f"  Docs:    http://localhost:{port}/docs")
+    print(f"  Health:  http://localhost:{port}/health")
     print()
-    start_server()
+    start_server(port=port)

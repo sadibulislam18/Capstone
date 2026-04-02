@@ -11,6 +11,13 @@ Author: MediScan Project
 Version: 6.1 (Feb 2026)
 """
 
+# ── MUST BE SET BEFORE ANY PaddlePaddle imports ──
+import os
+os.environ['FLAGS_enable_pir_api'] = '0'
+os.environ['FLAGS_enable_pir_in_executor'] = '0'
+os.environ['FLAGS_pir_apply_inplace_pass'] = '0'
+os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware

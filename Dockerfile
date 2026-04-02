@@ -40,10 +40,6 @@ RUN mkdir -p data/uploads data/results
 # Expose port (Railway sets PORT env variable)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
-
 # Start the server
 # Railway provides PORT env variable, default to 8000
 CMD ["sh", "-c", "uvicorn backend.fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"]

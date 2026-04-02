@@ -5,8 +5,8 @@
 
 FROM python:3.11-slim
 
-# Install system dependencies needed by OpenCV, PaddleOCR
-# Cache bust: v2
+# Install system dependencies needed by OpenCV, PaddleOCR, and Git LFS
+# Cache bust: v3
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libfontconfig1 \
     wget \
+    git \
+    git-lfs \
+    && git lfs install \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -31,8 +34,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy entire project
 COPY backend/ ./backend/
 COPY src/ ./src/
-COPY experiments/ ./experiments/
-COPY models/ ./models/
+
+# Clone repo and pull LFS files (actual .pt model weights)
+# Uses build arg for private repo access
+ARG GITHUB_TOKEN
+RUN git clone https://${GITHUB_TOKEN}@github.com/sadibulislam18/Capstone.git /tmp/repo && \
+    cd /tmp/repo && git lfs pull && \
+    cp -r /tmp/repo/experiments /app/experiments && \
+    cp -r /tmp/repo/models /app/models && \
+    rm -rf /tmp/repo
 
 # Create data directories
 RUN mkdir -p data/uploads data/results

@@ -173,11 +173,19 @@ class PaddleOCREngine:
         try:
             results = self.ocr.predict(image)
             
+            # ── DEBUG: Log raw output to understand the format ──
+            print(f"[PaddleOCR DEBUG] Raw result type: {type(results)}")
+            print(f"[PaddleOCR DEBUG] Raw result: {results}")
+            
             if not results:
+                print("[PaddleOCR DEBUG] results is empty/None")
                 return []
             
             text_results = []
-            for page_result in results:
+            for i, page_result in enumerate(results):
+                print(f"[PaddleOCR DEBUG] page_result[{i}] type: {type(page_result)}")
+                print(f"[PaddleOCR DEBUG] page_result[{i}]: {page_result}")
+                
                 rec_texts = page_result.get('rec_texts', [])
                 rec_scores = page_result.get('rec_scores', [])
                 
@@ -188,7 +196,9 @@ class PaddleOCREngine:
             return text_results
             
         except Exception as e:
-            print(f"[PaddleOCR Error] {e}")
+            print(f"[PaddleOCR Error] {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def recognize(self, image: np.ndarray, field_type: str = None) -> Dict:

@@ -42,4 +42,4 @@ EXPOSE 8000
 
 # Start the server
 # Railway provides PORT env variable, default to 8000
-CMD uvicorn backend.fastapi_app:app --host 0.0.0.0 --port $PORT
+CMD ["/bin/sh", "-c", "uvicorn backend.fastapi_app:app --host 0.0.0.0 --port ${PORT:-8000}"]

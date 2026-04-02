@@ -111,6 +111,50 @@ async def root():
     }
 
 
+@app.get("/debug-ocr")
+async def debug_ocr():
+    """Debug endpoint to test PaddleOCR directly on Railway."""
+    import paddleocr
+    ocr_engine = extractor.ocr_engine if extractor else None
+    
+    info = {
+        "paddleocr_version": paddleocr.__version__,
+        "ocr_engine_loaded": ocr_engine is not None,
+    }
+    
+    if ocr_engine:
+        # Create a simple test image with text
+        test_img = np.zeros((100, 300, 3), dtype=np.uint8) + 255
+        cv2.putText(test_img, "Test OCR 123", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 2)
+        
+        # Run raw predict
+        try:
+            results = ocr_engine.ocr.predict(test_img)
+            info["raw_result_type"] = str(type(results))
+            info["raw_result_len"] = len(results) if results else 0
+            
+            if results and len(results) > 0:
+                r0 = results[0]
+                info["item0_type"] = str(type(r0))
+                info["item0_keys"] = list(r0.keys()) if hasattr(r0, 'keys') else "no keys"
+                
+                rec_texts = r0.get('rec_texts', 'KEY_NOT_FOUND') if hasattr(r0, 'get') else 'NO_GET'
+                rec_scores = r0.get('rec_scores', 'KEY_NOT_FOUND') if hasattr(r0, 'get') else 'NO_GET'
+                info["rec_texts"] = str(rec_texts)
+                info["rec_scores"] = str(rec_scores)
+                
+                # Also try attribute access
+                info["has_rec_texts_attr"] = hasattr(r0, 'rec_texts')
+                if hasattr(r0, 'rec_texts'):
+                    info["attr_rec_texts"] = str(r0.rec_texts)
+                    
+                info["item0_repr"] = repr(r0)[:500]
+        except Exception as e:
+            info["error"] = f"{type(e).__name__}: {e}"
+    
+    return info
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

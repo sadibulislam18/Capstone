@@ -2,6 +2,9 @@
 builder = "DOCKERFILE"
 dockerfilePath = "./Dockerfile"
 
+[build.args]
+GITHUB_TOKEN = "${{GITHUB_TOKEN}}"
+
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300

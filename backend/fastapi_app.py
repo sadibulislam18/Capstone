@@ -118,36 +118,6 @@ async def root():
     }
 
 
-@app.get("/debug-ocr")
-async def debug_ocr():
-    """Debug endpoint to test PaddleOCR directly on Railway."""
-    import paddleocr
-    import paddle
-    ocr_engine = extractor.ocr_engine if extractor else None
-    
-    info = {
-        "paddleocr_version": paddleocr.__version__,
-        "paddlepaddle_version": paddle.__version__,
-        "ocr_engine_loaded": ocr_engine is not None,
-        "using_v3_api": ocr_engine._use_v3_api if ocr_engine else None,
-    }
-    
-    if ocr_engine:
-        # Create a simple test image with text
-        test_img = np.zeros((100, 300, 3), dtype=np.uint8) + 255
-        cv2.putText(test_img, "Test OCR 123", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 2)
-        
-        # Test using the engine's own recognize method
-        try:
-            result = ocr_engine.recognize(test_img, field_type='MEDICINE')
-            info["recognize_text"] = result.get('text', '')
-            info["recognize_confidence"] = result.get('confidence', 0.0)
-        except Exception as e:
-            info["recognize_error"] = f"{type(e).__name__}: {e}"
-    
-    return info
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

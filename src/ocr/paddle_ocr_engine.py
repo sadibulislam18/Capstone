@@ -29,6 +29,10 @@ from typing import Dict, List, Tuple, Optional
 os.environ['GLOG_v'] = '0'
 os.environ['FLAGS_log_dir'] = ''
 
+# Disable PaddlePaddle PIR mode (causes NotImplementedError on Railway CPU)
+os.environ['FLAGS_enable_pir_api'] = '0'
+os.environ['FLAGS_enable_pir_in_executor'] = '0'
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))

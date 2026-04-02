@@ -21,6 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && git lfs install \
     && rm -rf /var/lib/apt/lists/*
 
+# Disable PaddlePaddle PIR mode (causes crashes on Railway CPU)
+ENV FLAGS_enable_pir_api=0
+ENV FLAGS_enable_pir_in_executor=0
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
 # Set working directory
 WORKDIR /app
 
